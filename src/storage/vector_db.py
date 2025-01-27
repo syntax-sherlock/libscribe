@@ -1,4 +1,3 @@
-import os
 import logging
 import time
 import warnings
@@ -17,18 +16,16 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.voyageai import VoyageEmbedding
 
 from llama_index.vector_stores.pinecone import PineconeVectorStore
-from dotenv import load_dotenv
-
+from ..config import get_env_var
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
 
 # Initialize embedding model
 OUTPUT_DIMENSION = 512
-voyage_api_key = os.environ.get("VOYAGE_API_KEY")
+voyage_api_key = get_env_var("VOYAGE_API_KEY")
 embed_model = VoyageEmbedding(
     model_name="voyage-code-3",
     output_dimension=OUTPUT_DIMENSION,
@@ -37,7 +34,7 @@ embed_model = VoyageEmbedding(
 
 # Initialize Pinecone client
 index_name = "github-repos"
-pinecone_api_key = os.environ.get("PINECONE_API_KEY")
+pinecone_api_key = get_env_var("PINECONE_API_KEY")
 pinecone_client = PineconeGRPC(api_key=pinecone_api_key)
 
 

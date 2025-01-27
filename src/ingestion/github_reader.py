@@ -6,10 +6,7 @@ import os
 from typing import List, Optional
 from llama_index.readers.github import GithubClient, GithubRepositoryReader
 from llama_index.core import Document
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
+from ..config import get_env_var
 
 
 class GithubReaderWrapper:
@@ -17,9 +14,7 @@ class GithubReaderWrapper:
 
     def __init__(self, github_token: Optional[str] = None):
         """Initialize the GitHub reader with optional token."""
-        self.github_token = github_token or os.environ.get("GITHUB_TOKEN")
-        if not self.github_token:
-            raise ValueError("GITHUB_TOKEN environment variable is not set")
+        self.github_token = github_token or get_env_var("GITHUB_TOKEN")
 
         # Initialize the GitHub client
         self.github_client = GithubClient(github_token=self.github_token, verbose=True)
