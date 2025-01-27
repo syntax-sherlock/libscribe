@@ -248,7 +248,7 @@ A tool for ingesting library documentation and source code to enable AI models t
 - [x] Set up FastAPI.
 - [x] Implement `POST /ingest` endpoint.
 - [ ] Implement `POST /query` endpoint.
-- [ ] Test API locally.
+- [x] Test API locally.
 
 ### Phase 5: Testing
 
