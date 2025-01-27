@@ -1,21 +1,14 @@
 import logging
 import time
-import warnings
-
-# TODO: Remove after https://github.com/BerriAI/litellm/issues/7560 is fixed
-warnings.filterwarnings(
-    "ignore", category=UserWarning, module="pydantic._internal._config"
-)
-
-from pinecone.grpc import PineconeGRPC
-from pinecone import ServerlessSpec
-from pinecone.core.openapi.shared.exceptions import PineconeApiException
 
 from llama_index.core.ingestion import IngestionPipeline
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.voyageai import VoyageEmbedding
-
 from llama_index.vector_stores.pinecone import PineconeVectorStore
+from pinecone import ServerlessSpec
+from pinecone.core.openapi.shared.exceptions import PineconeApiException
+from pinecone.grpc import PineconeGRPC
+
 from ..config import get_env_var
 
 # Configure logging

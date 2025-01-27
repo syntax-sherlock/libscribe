@@ -1,10 +1,10 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel, HttpUrl
-from typing import Optional, Dict
 import datetime
 
-from ..utils.repo_parsing import extract_owner_repo
+from fastapi import BackgroundTasks, FastAPI, HTTPException
+from pydantic import BaseModel, HttpUrl
+
 from ..ingestion.processing import process_repository
+from ..utils.repo_parsing import extract_owner_repo
 
 app = FastAPI(title="LibScribe API")
 
@@ -25,7 +25,7 @@ async def health_check():
 class IngestRequest(BaseModel):
     repo_url: HttpUrl
     branch: str = "main"
-    metadata: Optional[Dict] = {}
+    metadata: dict | None = {}
 
 
 @app.post("/ingest")
@@ -57,9 +57,11 @@ def ingest_repository(request: IngestRequest, background_tasks: BackgroundTasks)
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error: {str(e)}"
+        ) from e
 
 
 if __name__ == "__main__":

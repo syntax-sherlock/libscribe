@@ -1,8 +1,8 @@
-from typing import List
 from llama_index.core import Document
+
+from ..storage.vector_db import process_documents
 from ..utils.repo_parsing import extract_owner_repo
 from .github_reader import fetch_github
-from ..storage.vector_db import process_documents
 
 
 def create_namespace(owner: str, repo: str) -> str:
@@ -20,13 +20,13 @@ def process_repository(repo_url: str, branch: str, metadata: dict) -> None:
 
 
 def enrich_documents(
-    docs: List[Document],
+    docs: list[Document],
     owner: str,
     repo: str,
     branch: str,
     namespace: str,
     metadata: dict,
-) -> List[Document]:
+) -> list[Document]:
     for doc in docs:
         doc.metadata.update(
             {

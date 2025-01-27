@@ -1,4 +1,5 @@
 import os
+
 import pytest
 
 from config import get_env_var

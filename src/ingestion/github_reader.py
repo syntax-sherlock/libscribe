@@ -2,17 +2,16 @@
 GitHub repository reader using llama_index.
 """
 
-import os
-from typing import List, Optional
-from llama_index.readers.github import GithubClient, GithubRepositoryReader
 from llama_index.core import Document
+from llama_index.readers.github import GithubClient, GithubRepositoryReader
+
 from ..config import get_env_var
 
 
 class GithubReaderWrapper:
-    """Wrapper for llama_index's GithubRepositoryReader with additional functionality."""
+    """Wrapper for GithubRepositoryReader with additional functionality."""
 
-    def __init__(self, github_token: Optional[str] = None):
+    def __init__(self, github_token: str | None = None):
         """Initialize the GitHub reader with optional token."""
         self.github_token = github_token or get_env_var("GITHUB_TOKEN")
 
@@ -21,7 +20,7 @@ class GithubReaderWrapper:
 
     def fetch_repository(
         self, owner: str, repo: str, branch: str = "main"
-    ) -> List[Document]:
+    ) -> list[Document]:
         """
         Fetch repository content from GitHub using llama_index's GithubRepositoryReader.
 
@@ -69,13 +68,13 @@ class GithubReaderWrapper:
             return documents
 
         except Exception as e:
-            raise Exception(f"Error fetching repository: {str(e)}")
+            raise Exception(f"Error fetching repository: {str(e)}") from e
 
 
 # Create a global reader instance
 github_reader = GithubReaderWrapper()
 
 
-def fetch_github(repo: str, owner: str, branch: str = "main") -> List[Document]:
+def fetch_github(repo: str, owner: str, branch: str = "main") -> list[Document]:
     """Fetch GitHub repository content using the global reader instance."""
     return github_reader.fetch_repository(owner, repo, branch)
