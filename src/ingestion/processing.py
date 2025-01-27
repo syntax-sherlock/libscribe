@@ -1,8 +1,7 @@
 from llama_index.core import Document
-
-from ..storage.vector_db import process_documents
-from ..utils.repo_parsing import extract_owner_repo
-from .github_reader import fetch_github
+from src.ingestion.github_reader import fetch_github
+from src.storage.vector_db import process_documents
+from src.utils.repo_parsing import extract_owner_repo
 
 
 def create_namespace(owner: str, repo: str) -> str:

@@ -8,8 +8,7 @@ from llama_index.vector_stores.pinecone import PineconeVectorStore
 from pinecone import ServerlessSpec
 from pinecone.core.openapi.shared.exceptions import PineconeApiException
 from pinecone.grpc import PineconeGRPC
-
-from ..config import get_env_var
+from src.config import get_env_var
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

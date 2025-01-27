@@ -4,8 +4,7 @@ GitHub repository reader using llama_index.
 
 from llama_index.core import Document
 from llama_index.readers.github import GithubClient, GithubRepositoryReader
-
-from ..config import get_env_var
+from src.config import get_env_var
 
 
 class GithubReaderWrapper:

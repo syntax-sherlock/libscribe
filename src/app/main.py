@@ -2,9 +2,8 @@ import datetime
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, HttpUrl
-
-from ..ingestion.processing import process_repository
-from ..utils.repo_parsing import extract_owner_repo
+from src.ingestion.processing import process_repository
+from src.utils.repo_parsing import extract_owner_repo
 
 app = FastAPI(title="LibScribe API")
 
