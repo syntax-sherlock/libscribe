@@ -1,10 +1,7 @@
 import logging
 import time
 
-from llama_index.core.ingestion import IngestionPipeline
-from llama_index.core.node_parser import SentenceSplitter
-from llama_index.embeddings.voyageai import VoyageEmbedding
-from llama_index.vector_stores.pinecone import PineconeVectorStore
+from litellm import embedding
 from pinecone import ServerlessSpec
 from pinecone.core.openapi.shared.exceptions import PineconeApiException
 from pinecone.grpc import PineconeGRPC
@@ -15,14 +12,36 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# Initialize embedding model
+# Initialize embedding model settings
 OUTPUT_DIMENSION = 512
-voyage_api_key = get_env_var("VOYAGE_API_KEY")
-embed_model = VoyageEmbedding(
-    model_name="voyage-code-3",
-    output_dimension=OUTPUT_DIMENSION,
-    voyage_api_key=voyage_api_key,
-)
+EMBEDDING_MODEL = "voyage/voyage-code-3"
+
+
+def get_embedding(text: str) -> list[float]:
+    """Get embedding for text using LiteLLM."""
+    try:
+        response = embedding(
+            model=EMBEDDING_MODEL,
+            dimensions=OUTPUT_DIMENSION,
+            input=[text],
+        )
+        # The response is a LiteLLM EmbeddingResponse object
+        # response.data is a list of dictionaries, each with an 'embedding' key
+        if (
+            hasattr(response, "data")
+            and isinstance(response.data, list)
+            and response.data
+            and isinstance(response.data[0], dict)
+        ):
+            return response.data[0]["embedding"]
+
+        # If we get here, the response structure is not what we expect
+        logger.error(f"Unexpected response structure: {response}")
+        raise ValueError("Unexpected embedding response structure")
+    except Exception as e:
+        logger.error(f"Error getting embedding: {str(e)}")
+        raise
+
 
 # Initialize Pinecone client
 index_name = "github-repos"
@@ -65,49 +84,52 @@ def create_index_if_not_exists(index_name: str) -> str | None:
 create_index_if_not_exists(index_name)
 index = pinecone_client.Index(index_name)
 
-# vector_store = PineconeVectorStore(pinecone_index=index)
 
-# llm = LiteLLM(model="openrouter/anthropic/claude-3.5-haiku")
-# idx = VectorStoreIndex.from_vector_store(vector_store, embed_model=embed_model)
-
-# query_engine = idx.as_query_engine(llm=llm)
-# response = query_engine.query("How to set headers in request?")
-# print(response)
-
-
-def process_documents(documents, namespace: str = None):
+def process_documents(documents: list, namespace: str | None = None) -> None:
     """
-    Process documents through the ingestion pipeline.
+    Process documents and store them in Pinecone.
 
     Args:
         documents: List of documents to process
         namespace: Optional namespace for vector store
+
+    Raises:
+        ValueError: If documents list is empty
     """
+    if not documents:
+        logger.warning("No documents provided for processing")
+        return
+
     try:
-        logger.info(f"Starting to process {len(documents)} documents")
+        logger.info(f"Processing {len(documents)} documents")
+        logger.debug("Document paths:")
         for doc in documents:
-            logger.info(
-                f"Processing document: {doc.metadata.get('file_path', 'unknown')}"
-            )
-        # Create vector store with namespace
-        store = PineconeVectorStore(
-            pinecone_index=index, namespace=namespace if namespace else ""
+            logger.debug(f"- {doc.metadata.get('file_path', 'unknown')}")
+
+        # Process documents and generate embeddings if needed
+        vectors = []
+        for doc in documents:
+            if doc.embedding is None:
+                logger.debug(
+                    "Generating embedding for: "
+                    f"{doc.metadata.get('file_path', 'unknown')}"
+                )
+                doc.embedding = get_embedding(doc.text)
+            vectors.append((doc.id, doc.embedding, doc.metadata))
+
+        if not vectors:
+            logger.warning("No vectors generated from documents")
+            return
+
+        # Use Pinecone's built-in methods for simplicity
+        logger.info(f"Upserting {len(vectors)} vectors to Pinecone")
+        index.upsert(
+            vectors=vectors,
+            namespace=namespace or "",
         )
 
-        # Create pipeline with namespaced vector store
-        # Use larger chunk size and overlap to reduce fragmentation
-        # while preserving context
-        ingestion_pipeline = IngestionPipeline(
-            transformations=[
-                SentenceSplitter(),
-                embed_model,
-            ],
-            vector_store=store,
-        )
-
-        ingestion_pipeline.run(documents=documents, show_progress=True)
         logger.info(f"Successfully processed {len(documents)} documents")
 
     except Exception as e:
-        logger.error(f"Error processing documents: {str(e)}")
+        logger.error(f"Processing error: {str(e)}")
         raise
