@@ -1,27 +1,46 @@
-import datetime
+# ruff: noqa: E402
+import warnings
+from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, ConfigDict, HttpUrl
+
+# TODO: Remove after https://github.com/BerriAI/litellm/issues/7560 is fixed
+warnings.filterwarnings(
+    "ignore", category=UserWarning, module="pydantic._internal._config"
+)
+
 from src.ingestion.processing import process_repository
 from src.utils.repo_parsing import extract_owner_repo
 
 app = FastAPI(title="LibScribe API")
 
 
-@app.get("/health")
-async def health_check():
+class HealthResponse(BaseModel):
+    """Response model for health check endpoint."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["healthy"] = "healthy"
+    service: Literal["LibScribe API"] = "LibScribe API"
+    timestamp: str
+    version: str = "1.0.0"  # Consider moving to config
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health_check() -> HealthResponse:
     """
     Healthcheck endpoint to verify service status.
-    Returns basic service health information.
+    Returns basic service health information including service name, status,
+    and timestamp.
     """
-    return {
-        "status": "healthy",
-        "service": "LibScribe API",
-        "timestamp": datetime.datetime.utcnow().isoformat(),
-    }
+    return HealthResponse(timestamp=datetime.now(UTC).isoformat())
 
 
 class IngestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     repo_url: HttpUrl
     branch: str = "main"
     metadata: dict | None = {}

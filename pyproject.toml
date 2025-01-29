@@ -7,15 +7,12 @@ requires-python = ">=3.12"
 
 dependencies = [
     "fastapi>=0.115.7",
-    "llama-index>=0.12.14",
-    "llama-index-embeddings-voyageai>=0.3.4",
-    "llama-index-llms-litellm>=0.3.0",
-    "llama-index-readers-github>=0.5.0",
-    "llama-index-vector-stores-pinecone>=0.4.3",
     "pinecone[grpc]>=5.4.2",
     "pydantic>=2.10.6",
     "python-dotenv>=1.0.1",
     "uvicorn>=0.34.0",
+    "github3.py>=4.0.1",
+    "litellm>=1.59.8",
 ]
 
 [dependency-groups]
@@ -36,7 +33,9 @@ asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     "ignore:Type google\\._upb\\._message\\.MessageMapContainer uses PyType_Spec:DeprecationWarning",
     "ignore:Type google\\._upb\\._message\\.ScalarMapContainer uses PyType_Spec:DeprecationWarning",
-    "ignore::pytest.PytestDeprecationWarning",
+    "ignore:open_text is deprecated:DeprecationWarning",
+    "ignore:Support for class-based `config` is deprecated:DeprecationWarning",
+    "ignore:Valid config keys have changed in V2:UserWarning",
 ]
 
 [tool.uvicorn]
