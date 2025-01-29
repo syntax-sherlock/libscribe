@@ -1,13 +1,10 @@
 import logging
 
+from langchain_core.documents import Document
 from src.ingestion.github_reader import fetch_github
-from src.models.document import Document
+
 from src.storage.vector_db import process_documents
 from src.utils.repo_parsing import extract_owner_repo
-
-
-def create_namespace(owner: str, repo: str) -> str:
-    return f"github_{owner}_{repo}".lower().replace("-", "_")
 
 
 # Configure logging
@@ -17,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 def process_repository(repo_url: str, branch: str, metadata: dict) -> None:
     owner, repo = extract_owner_repo(repo_url)
-    namespace = create_namespace(owner, repo)
 
     logger.info(f"Fetching documents from {owner}/{repo}")
     documents = fetch_github(repo, owner, branch)
@@ -30,12 +26,10 @@ def process_repository(repo_url: str, branch: str, metadata: dict) -> None:
         return
 
     logger.info(f"Enriching {len(documents)} documents with metadata")
-    enriched_docs = enrich_documents(
-        documents, owner, repo, branch, namespace, metadata
-    )
+    enriched_docs = enrich_documents(documents, owner, repo, branch)
 
-    logger.info(f"Processing documents into vector store namespace: {namespace}")
-    process_documents(enriched_docs, namespace)
+    logger.info(f"Processing documents into vector store: {owner}/{repo}")
+    process_documents(enriched_docs)
 
 
 def enrich_documents(
@@ -43,17 +37,17 @@ def enrich_documents(
     owner: str,
     repo: str,
     branch: str,
-    namespace: str,
-    metadata: dict,
 ) -> list[Document]:
-    for doc in docs:
-        doc.metadata.update(
-            {
-                "owner": owner,
+
+    return [
+        Document(
+            page_content=doc.page_content,
+            metadata={
+                "path": doc.metadata.get("path"),
                 "repo": repo,
+                "owner": owner,
                 "branch": branch,
-                "namespace": namespace,
-                **metadata,
-            }
+            },
         )
-    return docs
+        for doc in docs
+    ]

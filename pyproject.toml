@@ -11,8 +11,12 @@ dependencies = [
     "pydantic>=2.10.6",
     "python-dotenv>=1.0.1",
     "uvicorn>=0.34.0",
-    "github3.py>=4.0.1",
-    "litellm>=1.59.8",
+    "langchain>=0.3.16",
+    "langchain-community>=0.3.16",
+    "langchain-voyageai>=0.1.4",
+    "langchain-core>=0.3.32",
+    "langchain-qdrant>=0.2.0",
+    "qdrant-client>=1.12.1",
 ]
 
 [dependency-groups]
