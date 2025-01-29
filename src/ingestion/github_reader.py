@@ -9,6 +9,14 @@ from langchain_core.documents import Document
 from langchain_community.document_loaders.github import GithubFileLoader
 from src.config import get_env_var
 
+IGNORED_DIRECTORIES = {
+    ".github",  # GitHub specific files and workflows
+    ".circleci",  # CircleCI configuration
+    ".gitlab",  # GitLab specific files
+    ".azure",  # Azure DevOps configurations
+    "workflows",  # GitHub Actions workflows
+}
+
 ALLOWED_EXTENSIONS = {
     ".py",  # Python files
     ".md",  # Markdown
@@ -19,6 +27,7 @@ ALLOWED_EXTENSIONS = {
     ".yml",  # YAML files
     ".ini",  # Config files
     ".html",  # HTML files
+    ".toml",  # TOML files
 }
 
 # Configure logging
@@ -33,8 +42,19 @@ class GithubReader:
         """Initialize the GitHub reader with optional token."""
         self.github_token = github_token or get_env_var("GITHUB_TOKEN")
 
+    def _is_ignored_directory(self, path: str) -> bool:
+        """Check if file path contains an ignored directory."""
+        path_parts = Path(path).parts
+        return any(ignored_dir in path_parts for ignored_dir in IGNORED_DIRECTORIES)
+
     def _is_allowed_file(self, path: str) -> bool:
-        """Check if file extension is in allowed list."""
+        """Check if file should be included based on directory and extension."""
+        # First check if file is in an ignored directory
+        if self._is_ignored_directory(path):
+            logger.debug(f"Skipping file in ignored directory: {path}")
+            return False
+
+        # Then check file extension
         extension = Path(path).suffix
         is_allowed = extension in ALLOWED_EXTENSIONS
         if not is_allowed:

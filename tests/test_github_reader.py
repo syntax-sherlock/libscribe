@@ -123,3 +123,33 @@ def test_is_allowed_file():
     assert not reader._is_allowed_file("image.png")
     assert not reader._is_allowed_file("script.sh")
     assert not reader._is_allowed_file("no_extension")
+
+    # Test ignored directories
+    assert not reader._is_allowed_file(".github/workflows/test.yml")
+    assert not reader._is_allowed_file("src/.github/config.md")
+    assert not reader._is_allowed_file(".circleci/config.yml")
+    assert not reader._is_allowed_file(".gitlab/ci.yml")
+    assert not reader._is_allowed_file(".azure/pipelines.yml")
+    assert not reader._is_allowed_file("workflows/deploy.yml")
+
+    # Test allowed nested directories
+    assert reader._is_allowed_file("docs/test.md")
+    assert reader._is_allowed_file("src/lib/utils.py")
+    assert reader._is_allowed_file("nested/path/to/file.rst")
+
+
+def test_is_ignored_directory():
+    reader = GithubReader(github_token="test_token")
+
+    # Test ignored directories
+    assert reader._is_ignored_directory(".github/workflows/test.yml")
+    assert reader._is_ignored_directory("src/.github/config.md")
+    assert reader._is_ignored_directory(".circleci/config.yml")
+    assert reader._is_ignored_directory(".gitlab/ci.yml")
+    assert reader._is_ignored_directory(".azure/pipelines.yml")
+    assert reader._is_ignored_directory("workflows/deploy.yml")
+
+    # Test allowed directories
+    assert not reader._is_ignored_directory("docs/test.md")
+    assert not reader._is_ignored_directory("src/lib/utils.py")
+    assert not reader._is_ignored_directory("nested/path/to/file.rst")
