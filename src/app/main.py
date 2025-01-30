@@ -1,20 +1,34 @@
-# ruff: noqa: E402
-import warnings
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Literal, Dict, Any
 
+import uvicorn
 from fastapi import BackgroundTasks, FastAPI, HTTPException
+from langchain.schema import Document
 from pydantic import BaseModel, ConfigDict, HttpUrl
-
-# TODO: Remove after https://github.com/BerriAI/litellm/issues/7560 is fixed
-warnings.filterwarnings(
-    "ignore", category=UserWarning, module="pydantic._internal._config"
-)
 
 from src.ingestion.processing import process_repository
 from src.utils.repo_parsing import extract_owner_repo
+from src.storage.vector_db import VectorDB
 
 app = FastAPI(title="LibScribe API")
+
+
+class QueryRequest(BaseModel):
+    """Request model for query endpoint."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    query: str
+
+
+class QueryResponse(BaseModel):
+    """Response model for query endpoint."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["success", "error"] = "success"
+    results: list[Document] = []
+    message: str | None = None
 
 
 class HealthResponse(BaseModel):
@@ -38,12 +52,38 @@ async def health_check() -> HealthResponse:
     return HealthResponse(timestamp=datetime.now(UTC).isoformat())
 
 
+@app.post("/query")
+def query_endpoint(request: QueryRequest) -> QueryResponse:
+    """
+    Query the ingested data for relevant information.
+
+    Parameters:
+    - query: Search query or prompt
+
+    Returns:
+    - JSON response with query results
+    """
+    try:
+        # Initialize vector database
+        vector_db = VectorDB()
+
+        # Perform the query
+        results = vector_db.query(query=request.query)
+
+        return QueryResponse(
+            status="success", results=results, message="Query completed successfully"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}") from e
+
+
 class IngestRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     repo_url: HttpUrl
     branch: str = "main"
-    metadata: dict | None = {}
 
 
 @app.post("/ingest")
@@ -54,7 +94,6 @@ def ingest_repository(request: IngestRequest, background_tasks: BackgroundTasks)
     Parameters:
     - repo_url: Full GitHub repository URL (e.g., https://github.com/owner/repo)
     - branch: Repository branch to ingest (default: "main")
-    - metadata: Optional metadata to attach to the documents
 
     Returns:
     - JSON response with status and job information
@@ -65,7 +104,7 @@ def ingest_repository(request: IngestRequest, background_tasks: BackgroundTasks)
 
         # Start background processing
         background_tasks.add_task(
-            process_repository, str(request.repo_url), request.branch, request.metadata
+            process_repository, str(request.repo_url), request.branch
         )
 
         return {
@@ -83,6 +122,4 @@ def ingest_repository(request: IngestRequest, background_tasks: BackgroundTasks)
 
 
 if __name__ == "__main__":
-    import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000)

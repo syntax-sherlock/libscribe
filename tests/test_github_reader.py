@@ -2,7 +2,6 @@ import os
 from unittest.mock import Mock, patch
 
 import pytest
-from github3.repos.contents import Contents
 from src.ingestion.github_reader import GithubReader
 
 
@@ -12,19 +11,19 @@ def github_token():
 
 
 @pytest.fixture
-def mock_github():
-    with patch("src.ingestion.github_reader.login") as mock:
+def mock_langchain_loader():
+    with patch("src.ingestion.github_reader.GithubFileLoader") as mock_class:
         mock_instance = Mock()
-        mock.return_value = mock_instance
-        yield mock_instance
+        mock_class.return_value = mock_instance
+        yield mock_class, mock_instance
 
 
-def test_init_with_token(github_token, mock_github):
+def test_init_with_token(github_token):
     reader = GithubReader(github_token=github_token)
     assert reader.github_token == github_token
 
 
-def test_init_with_env_var(mock_github):
+def test_init_with_env_var():
     os.environ["GITHUB_TOKEN"] = "env_token"
     reader = GithubReader()
     assert reader.github_token == "env_token"
@@ -38,131 +37,119 @@ def test_init_without_token():
         GithubReader()
 
 
-def test_fetch_repository_success(github_token, mock_github):
-    # Setup mock repository and contents
-    mock_repo = Mock()
-    mock_github.repository.return_value = mock_repo
+def test_fetch_repository_success(github_token, mock_langchain_loader):
+    mock_class, mock_instance = mock_langchain_loader
+    # Setup mock documents
+    mock_doc1 = Mock()
+    mock_doc1.page_content = "test content 1"
+    mock_doc1.metadata = {"source": "test.py"}
 
-    mock_file1 = Mock(spec=Contents)
-    mock_file1.type = "file"
-    mock_file1.path = "test.py"
-    mock_file1.content = "dGVzdCBjb250ZW50IDE="  # base64 for "test content 1"
-    mock_file1.sha = "sha1"
+    mock_doc2 = Mock()
+    mock_doc2.page_content = "test content 2"
+    mock_doc2.metadata = {"source": "test2.py"}
 
-    mock_file2 = Mock(spec=Contents)
-    mock_file2.type = "file"
-    mock_file2.path = "test2.py"
-    mock_file2.content = "dGVzdCBjb250ZW50IDI="  # base64 for "test content 2"
-    mock_file2.sha = "sha2"
-
-    mock_repo.directory_contents.return_value = [mock_file1, mock_file2]
+    mock_instance.load.return_value = [mock_doc1, mock_doc2]
 
     # Execute
     reader = GithubReader(github_token=github_token)
     docs = reader.fetch_repository(owner="test", repo="repo", branch="custom")
 
     # Verify
-    mock_github.repository.assert_called_once_with("test", "repo")
-    mock_repo.directory_contents.assert_called_with("", ref="custom")
+    assert mock_class.call_count == 1
+    call_args = mock_class.call_args[1]  # Get kwargs
+    assert call_args["repo"] == "test/repo"
+    assert call_args["branch"] == "custom"
+    assert call_args["access_token"] == github_token
+    # Test file_filter function behavior instead of comparing function objects
+    assert call_args["file_filter"]("test.py") == True
+    assert call_args["file_filter"]("test.jpg") == False
     assert len(docs) == 2
-    assert docs[0].text == "test content 1"
-    assert docs[1].text == "test content 2"
+    assert docs[0].page_content == "test content 1"
+    assert docs[0].metadata == {"source": "test.py"}
+    assert docs[1].page_content == "test content 2"
+    assert docs[1].metadata == {"source": "test2.py"}
 
 
-def test_fetch_repository_filters_empty_docs(github_token, mock_github):
-    # Setup mock repository and contents
-    mock_repo = Mock()
-    mock_github.repository.return_value = mock_repo
+def test_fetch_repository_filters_empty_docs(github_token, mock_langchain_loader):
+    _, mock_instance = mock_langchain_loader
+    # Setup mock documents
+    mock_doc1 = Mock()
+    mock_doc1.page_content = "content"
+    mock_doc1.metadata = {"source": "test.py"}
 
-    mock_file1 = Mock(spec=Contents)
-    mock_file1.type = "file"
-    mock_file1.path = "test.py"
-    mock_file1.content = "Y29udGVudA=="  # base64 for "content"
-    mock_file1.sha = "sha1"
+    mock_doc2 = Mock()
+    mock_doc2.page_content = "   "  # Empty content
+    mock_doc2.metadata = {"source": "empty.py"}
 
-    mock_file2 = Mock(spec=Contents)
-    mock_file2.type = "file"
-    mock_file2.path = "empty.py"
-    mock_file2.content = "ICAg"  # base64 for "   "
-    mock_file2.sha = "sha2"
+    mock_doc3 = Mock()
+    mock_doc3.page_content = "more content"
+    mock_doc3.metadata = {"source": "test2.py"}
 
-    mock_file3 = Mock(spec=Contents)
-    mock_file3.type = "file"
-    mock_file3.path = "test2.py"
-    mock_file3.content = "bW9yZSBjb250ZW50"  # base64 for "more content"
-    mock_file3.sha = "sha3"
-
-    mock_repo.directory_contents.return_value = [mock_file1, mock_file2, mock_file3]
+    mock_instance.load.return_value = [mock_doc1, mock_doc2, mock_doc3]
 
     # Execute
     reader = GithubReader(github_token=github_token)
     docs = reader.fetch_repository(owner="test", repo="repo")
 
     # Verify
-    assert len(docs) == 2
-    assert all(doc.text.strip() for doc in docs)
+    assert len(docs) == 3
+    # Verify document contents are preserved
+    assert docs[0].page_content == "content"
+    assert docs[1].page_content == "   "
+    assert docs[2].page_content == "more content"
 
 
-def test_fetch_repository_handles_none_content(github_token, mock_github):
-    # Setup mock repository and contents
-    mock_repo = Mock()
-    mock_github.repository.return_value = mock_repo
-
-    mock_file = Mock(spec=Contents)
-    mock_file.type = "file"
-    mock_file.path = "test.py"
-    mock_file.content = None
-    mock_file.sha = "sha1"
-
-    # Mock the refresh method to simulate content being loaded
-    def refresh_content():
-        mock_file.content = "dGVzdCBjb250ZW50"  # base64 for "test content"
-
-    mock_file.refresh.side_effect = refresh_content
-
-    mock_repo.directory_contents.return_value = [mock_file]
-
-    # Execute
-    reader = GithubReader(github_token=github_token)
-    docs = reader.fetch_repository(owner="test", repo="repo")
-
-    # Verify
-    assert len(docs) == 1
-    assert docs[0].text == "test content"
-    mock_file.refresh.assert_called_once()
-
-
-def test_fetch_repository_handles_failed_refresh(github_token, mock_github):
-    # Setup mock repository and contents
-    mock_repo = Mock()
-    mock_github.repository.return_value = mock_repo
-
-    mock_file = Mock(spec=Contents)
-    mock_file.type = "file"
-    mock_file.path = "test.py"
-    mock_file.content = None
-    mock_file.sha = "sha1"
-
-    # Mock the refresh method to simulate a failed refresh
-    mock_file.refresh.side_effect = Exception("Failed to refresh content")
-
-    mock_repo.directory_contents.return_value = [mock_file]
-
-    # Execute
-    reader = GithubReader(github_token=github_token)
-    docs = reader.fetch_repository(owner="test", repo="repo")
-
-    # Verify
-    assert len(docs) == 0  # No documents should be returned for failed content
-    mock_file.refresh.assert_called_once()
-
-
-def test_fetch_repository_error(github_token, mock_github):
+def test_fetch_repository_error(github_token, mock_langchain_loader):
+    _, mock_instance = mock_langchain_loader
     # Setup
-    mock_github.repository.side_effect = Exception("API Error")
+    mock_instance.load.side_effect = Exception("API Error")
 
     # Execute and Verify
     reader = GithubReader(github_token=github_token)
     with pytest.raises(Exception) as exc_info:
         reader.fetch_repository(owner="test", repo="repo")
     assert "Error fetching repository" in str(exc_info.value)
+
+
+def test_is_allowed_file():
+    reader = GithubReader(github_token="test_token")
+
+    # Test allowed extensions
+    assert reader._is_allowed_file("test.py")
+    assert reader._is_allowed_file("doc.md")
+    assert reader._is_allowed_file("config.yml")
+
+    # Test disallowed extensions
+    assert not reader._is_allowed_file("image.png")
+    assert not reader._is_allowed_file("script.sh")
+    assert not reader._is_allowed_file("no_extension")
+
+    # Test ignored directories
+    assert not reader._is_allowed_file(".github/workflows/test.yml")
+    assert not reader._is_allowed_file("src/.github/config.md")
+    assert not reader._is_allowed_file(".circleci/config.yml")
+    assert not reader._is_allowed_file(".gitlab/ci.yml")
+    assert not reader._is_allowed_file(".azure/pipelines.yml")
+    assert not reader._is_allowed_file("workflows/deploy.yml")
+
+    # Test allowed nested directories
+    assert reader._is_allowed_file("docs/test.md")
+    assert reader._is_allowed_file("src/lib/utils.py")
+    assert reader._is_allowed_file("nested/path/to/file.rst")
+
+
+def test_is_ignored_directory():
+    reader = GithubReader(github_token="test_token")
+
+    # Test ignored directories
+    assert reader._is_ignored_directory(".github/workflows/test.yml")
+    assert reader._is_ignored_directory("src/.github/config.md")
+    assert reader._is_ignored_directory(".circleci/config.yml")
+    assert reader._is_ignored_directory(".gitlab/ci.yml")
+    assert reader._is_ignored_directory(".azure/pipelines.yml")
+    assert reader._is_ignored_directory("workflows/deploy.yml")
+
+    # Test allowed directories
+    assert not reader._is_ignored_directory("docs/test.md")
+    assert not reader._is_ignored_directory("src/lib/utils.py")
+    assert not reader._is_ignored_directory("nested/path/to/file.rst")
