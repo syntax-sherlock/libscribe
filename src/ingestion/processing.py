@@ -1,6 +1,6 @@
 import logging
 
-from langchain_core.documents import Document
+from langchain.schema import Document
 from src.ingestion.github_reader import fetch_github
 
 from src.storage.vector_db import process_documents
@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def process_repository(repo_url: str, branch: str, metadata: dict) -> None:
+def process_repository(repo_url: str, branch: str):
     owner, repo = extract_owner_repo(repo_url)
 
     logger.info(f"Fetching documents from {owner}/{repo}")
