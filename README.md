@@ -14,52 +14,59 @@ libscribe is a tool for ingesting and processing code repositories, primarily fr
 graph TD
     %% API Layer
     A[FastAPI Application] --> |POST /ingest| B[Background Task]
+    A --> |POST /query| Q[Query Processing]
 
     %% Ingestion Layer
-    B --> C[GitHub Reader]
+    B --> C[LangChain GitHub Loader]
     C --> |fetch_repository| D[GitHub API]
     D --> |raw files| C
-    C --> |Document objects| E[Processing Pipeline]
+    C --> |Document objects| E[Document Processing]
 
     %% Processing Layer
-    E --> |enrich_documents| F[Document Enrichment]
+    E --> |enrich_documents| F[Metadata Enrichment]
     F --> |add metadata| G[Enriched Documents]
 
     %% Storage Layer
-    G --> H[Ingestion Pipeline]
-    H --> |SentenceSplitter| I[Text Chunks]
-    I --> |VoyageEmbedding| J[Embeddings]
-    J --> |store vectors| K[Pinecone DB]
+    G --> H[Vector Store Pipeline]
+    H --> |VoyageAI Embeddings| J[Document Vectors]
+    J --> |store vectors| K[Qdrant DB]
+
+    %% Query Layer
+    Q --> |similarity_search| K
+    K --> |relevant docs| Q
 
     %% External Services
-    D --> |filtered files| C
     subgraph External Services
         D[GitHub API]
-        L[Voyage AI API]
-        K[Pinecone DB]
+        V[VoyageAI API]
+        K[Qdrant DB]
     end
 
     %% Configurations
     M[Environment Config] --> |API keys| A
     M --> |tokens| C
     M --> |credentials| K
+    M --> |api key| V
 
     %% Data Flow Notes
     classDef external fill:#f96,stroke:#333
-    class D,L,K external
+    class D,V,K external
 ```
 
 The diagram above illustrates the system's architecture and data flow:
 
-1. The FastAPI application receives repository ingestion requests
+1. The FastAPI application handles both ingestion and query requests
 2. A background task is created to handle the ingestion process
-3. The GitHub Reader fetches and filters repository content
+3. LangChain's GitHub Loader fetches and filters repository content
 4. Documents are enriched with metadata (owner, repo, branch, etc.)
-5. The ingestion pipeline:
-   - Splits text into chunks
-   - Generates embeddings using Voyage AI
-   - Stores vectors in Pinecone DB
-6. External services (GitHub, Voyage AI, Pinecone) are integrated via API keys
+5. The vector store pipeline:
+   - Generates embeddings using VoyageAI
+   - Stores vectors in Qdrant DB
+6. The query pipeline:
+   - Processes search queries
+   - Performs similarity search in Qdrant
+   - Returns relevant documents
+7. External services (GitHub, VoyageAI, Qdrant) are integrated via API keys
 
 ## Usage
 
