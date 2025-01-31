@@ -93,8 +93,8 @@ def test_fetch_repository_success(github_token, mock_langchain_loader):
     assert call_args["branch"] == "custom"
     assert call_args["access_token"] == github_token
     # Test file_filter function behavior instead of comparing function objects
-    assert call_args["file_filter"]("test.py") == True
-    assert call_args["file_filter"]("test.jpg") == False
+    assert call_args["file_filter"]("test.py") is True
+    assert call_args["file_filter"]("test.jpg") is False
     assert len(docs) == 2
     assert docs[0].page_content == "test content 1"
     assert docs[0].metadata == {"source": "test.py"}
@@ -107,9 +107,9 @@ def test_fetch_repository_success(github_token, mock_langchain_loader):
 
     # Verify language-specific filtering
     call_args = mock_class.call_args[1]
-    assert call_args["file_filter"]("test.py") == True
-    assert call_args["file_filter"]("test.ts") == False
-    assert call_args["file_filter"]("doc.md") == True  # Common extension
+    assert call_args["file_filter"]("test.py") is True
+    assert call_args["file_filter"]("test.ts") is False
+    assert call_args["file_filter"]("doc.md") is True  # Common extension
 
 
 def test_fetch_repository_filters_empty_docs(github_token, mock_langchain_loader):
