@@ -12,45 +12,32 @@ libscribe is a tool for ingesting and processing code repositories, primarily fr
 
 ```mermaid
 graph TD
-    %% API Layer
-    A[FastAPI Application] --> |POST /ingest| B[Background Task]
-    A --> |POST /query| Q[Query Processing]
+    %% Core Components
+    A[FastAPI Application] --> |Ingest| B[Document Processing]
+    A --> |Query| Q[Query Processing]
 
-    %% Ingestion Layer
-    B --> C[LangChain GitHub Loader]
-    C --> |fetch_repository| D[GitHub API]
-    D --> |raw files| C
-    C --> |Document objects| E[Document Processing]
+    %% Processing Flow
+    B --> C[GitHub Loader]
+    C --> D[GitHub API]
+    C --> E[Vector Store]
 
-    %% Processing Layer
-    E --> |enrich_documents| F[Metadata Enrichment]
-    F --> |add metadata| G[Enriched Documents]
-
-    %% Storage Layer
-    G --> H[Vector Store Pipeline]
-    H --> |VoyageAI Embeddings| J[Document Vectors]
-    J --> |store vectors| K[Qdrant DB]
-
-    %% Query Layer
-    Q --> |similarity_search| K
-    K --> |relevant docs| Q
+    %% Storage & Query
+    E --> |Embeddings| K[Vector Database]
+    Q --> |Search| K
+    K --> |Results| Q
 
     %% External Services
     subgraph External Services
         D[GitHub API]
-        V[VoyageAI API]
-        K[Qdrant DB]
+        K[Vector Database]
     end
 
-    %% Configurations
-    M[Environment Config] --> |API keys| A
-    M --> |tokens| C
-    M --> |credentials| K
-    M --> |api key| V
+    %% Configuration
+    M[Environment Config] --> A
 
-    %% Data Flow Notes
+    %% Styling
     classDef external fill:#f96,stroke:#333
-    class D,V,K external
+    class D,K external
 ```
 
 The diagram above illustrates the system's architecture and data flow:
