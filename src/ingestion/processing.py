@@ -12,11 +12,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def process_repository(repo_url: str, branch: str):
+def process_repository(
+    repo_url: str, branch: str = "main", language: str | None = None
+) -> None:
+    """
+    Process a GitHub repository by fetching its contents and storing them in the vector database.
+
+    Args:
+        repo_url: Full GitHub repository URL
+        branch: Repository branch to process (default: main)
+        language: Programming language to filter by (default: None)
+    """
     owner, repo = extract_owner_repo(repo_url)
 
     logger.info(f"Fetching documents from {owner}/{repo}")
-    documents = fetch_github(repo, owner, branch)
+    documents = fetch_github(repo, owner, branch, language)
 
     if not documents:
         logger.warning(

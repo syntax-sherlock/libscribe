@@ -1,8 +1,9 @@
 import logging
 
-from qdrant_client import QdrantClient, models
-from langchain_voyageai import VoyageAIEmbeddings
+from langchain.schema import Document
 from langchain_qdrant import QdrantVectorStore
+from langchain_voyageai import VoyageAIEmbeddings
+from qdrant_client import QdrantClient, models
 from src.config import get_env_var
 
 # Configure logging
@@ -22,10 +23,13 @@ class VectorDB:
 
     def _init_embedding(self) -> VoyageAIEmbeddings:
         """Initialize the embedding model."""
+        from pydantic import SecretStr
+
         return VoyageAIEmbeddings(
             model="voyage-code-3",
             output_dimension=512,
-            api_key=get_env_var("VOYAGE_API_KEY"),
+            api_key=SecretStr(get_env_var("VOYAGE_API_KEY")),
+            batch_size=10,
         )
 
     def _init_qdrant_client(self) -> QdrantClient:
@@ -45,7 +49,7 @@ class VectorDB:
                 ),
             )
 
-    def query(self, query: str) -> list[dict]:
+    def query(self, query: str) -> list[Document]:
         """
         Query the vector database for relevant documents.
 
@@ -61,7 +65,8 @@ class VectorDB:
                 collection_name="github",
                 embedding=self.embedding,
             )
-            return vector_store.similarity_search(query)
+            docs = vector_store.similarity_search(query)
+            return docs
         except Exception as e:
             logger.error(f"Query error: {str(e)}")
             raise

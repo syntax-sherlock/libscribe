@@ -21,6 +21,38 @@ def mock_langchain_loader():
 def test_init_with_token(github_token):
     reader = GithubReader(github_token=github_token)
     assert reader.github_token == github_token
+    assert reader.allowed_extensions == reader._get_allowed_extensions(None)
+
+
+def test_init_with_language():
+    reader = GithubReader(github_token="test_token", language="python")
+    assert ".py" in reader.allowed_extensions
+    assert ".pyi" in reader.allowed_extensions
+    assert ".md" in reader.allowed_extensions  # Common extension
+    assert ".ts" not in reader.allowed_extensions  # TypeScript extension
+
+
+def test_get_allowed_extensions():
+    reader = GithubReader(github_token="test_token")
+
+    # Test with no language (should include all extensions)
+    all_extensions = reader._get_allowed_extensions(None)
+    assert ".py" in all_extensions
+    assert ".ts" in all_extensions
+    assert ".md" in all_extensions
+
+    # Test with specific language
+    python_extensions = reader._get_allowed_extensions("python")
+    assert ".py" in python_extensions
+    assert ".pyi" in python_extensions
+    assert ".md" in python_extensions  # Common extension
+    assert ".ts" not in python_extensions  # TypeScript extension
+
+    # Test with unknown language
+    unknown_extensions = reader._get_allowed_extensions("unknown")
+    assert ".md" in unknown_extensions  # Common extension
+    assert ".py" not in unknown_extensions
+    assert ".ts" not in unknown_extensions
 
 
 def test_init_with_env_var():
@@ -50,7 +82,7 @@ def test_fetch_repository_success(github_token, mock_langchain_loader):
 
     mock_instance.load.return_value = [mock_doc1, mock_doc2]
 
-    # Execute
+    # Test with no language
     reader = GithubReader(github_token=github_token)
     docs = reader.fetch_repository(owner="test", repo="repo", branch="custom")
 
@@ -68,6 +100,16 @@ def test_fetch_repository_success(github_token, mock_langchain_loader):
     assert docs[0].metadata == {"source": "test.py"}
     assert docs[1].page_content == "test content 2"
     assert docs[1].metadata == {"source": "test2.py"}
+
+    # Test with specific language
+    reader = GithubReader(github_token=github_token, language="python")
+    docs = reader.fetch_repository(owner="test", repo="repo", branch="custom")
+
+    # Verify language-specific filtering
+    call_args = mock_class.call_args[1]
+    assert call_args["file_filter"]("test.py") == True
+    assert call_args["file_filter"]("test.ts") == False
+    assert call_args["file_filter"]("doc.md") == True  # Common extension
 
 
 def test_fetch_repository_filters_empty_docs(github_token, mock_langchain_loader):
@@ -112,27 +154,40 @@ def test_fetch_repository_error(github_token, mock_langchain_loader):
 
 
 def test_is_allowed_file():
+    # Test with no language specified
     reader = GithubReader(github_token="test_token")
-
-    # Test allowed extensions
     assert reader._is_allowed_file("test.py")
     assert reader._is_allowed_file("doc.md")
     assert reader._is_allowed_file("config.yml")
-
-    # Test disallowed extensions
+    assert reader._is_allowed_file("app.ts")
     assert not reader._is_allowed_file("image.png")
-    assert not reader._is_allowed_file("script.sh")
-    assert not reader._is_allowed_file("no_extension")
 
-    # Test ignored directories
-    assert not reader._is_allowed_file(".github/workflows/test.yml")
-    assert not reader._is_allowed_file("src/.github/config.md")
-    assert not reader._is_allowed_file(".circleci/config.yml")
-    assert not reader._is_allowed_file(".gitlab/ci.yml")
-    assert not reader._is_allowed_file(".azure/pipelines.yml")
-    assert not reader._is_allowed_file("workflows/deploy.yml")
+    # Test with Python
+    python_reader = GithubReader(github_token="test_token", language="python")
+    assert python_reader._is_allowed_file("test.py")
+    assert python_reader._is_allowed_file("types.pyi")
+    assert python_reader._is_allowed_file("doc.md")  # Common extension
+    assert not python_reader._is_allowed_file("app.ts")  # TypeScript file
+    assert not python_reader._is_allowed_file("image.png")
 
-    # Test allowed nested directories
+    # Test with TypeScript
+    ts_reader = GithubReader(github_token="test_token", language="typescript")
+    assert ts_reader._is_allowed_file("app.ts")
+    assert ts_reader._is_allowed_file("component.tsx")
+    assert ts_reader._is_allowed_file("doc.md")  # Common extension
+    assert not ts_reader._is_allowed_file("test.py")  # Python file
+    assert not ts_reader._is_allowed_file("image.png")
+
+    # Test ignored directories (should work regardless of language)
+    for test_reader in [reader, python_reader, ts_reader]:
+        assert not test_reader._is_allowed_file(".github/workflows/test.yml")
+        assert not test_reader._is_allowed_file("src/.github/config.md")
+        assert not test_reader._is_allowed_file(".circleci/config.yml")
+        assert not test_reader._is_allowed_file(".gitlab/ci.yml")
+        assert not test_reader._is_allowed_file(".azure/pipelines.yml")
+        assert not test_reader._is_allowed_file("workflows/deploy.yml")
+
+    # Test allowed nested directories (only for default reader)
     assert reader._is_allowed_file("docs/test.md")
     assert reader._is_allowed_file("src/lib/utils.py")
     assert reader._is_allowed_file("nested/path/to/file.rst")

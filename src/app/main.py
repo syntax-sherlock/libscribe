@@ -1,14 +1,13 @@
 from datetime import UTC, datetime
-from typing import Literal, Dict, Any
+from typing import Literal
 
 import uvicorn
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from langchain.schema import Document
 from pydantic import BaseModel, ConfigDict, HttpUrl
-
 from src.ingestion.processing import process_repository
-from src.utils.repo_parsing import extract_owner_repo
 from src.storage.vector_db import VectorDB
+from src.utils.repo_parsing import extract_owner_repo
 
 app = FastAPI(title="LibScribe API")
 
@@ -80,10 +79,13 @@ def query_endpoint(request: QueryRequest) -> QueryResponse:
 
 
 class IngestRequest(BaseModel):
+    """Request model for repository ingestion."""
+
     model_config = ConfigDict(extra="forbid")
 
     repo_url: HttpUrl
     branch: str = "main"
+    language: str | None = None
 
 
 @app.post("/ingest")
@@ -104,7 +106,7 @@ def ingest_repository(request: IngestRequest, background_tasks: BackgroundTasks)
 
         # Start background processing
         background_tasks.add_task(
-            process_repository, str(request.repo_url), request.branch
+            process_repository, str(request.repo_url), request.branch, request.language
         )
 
         return {
